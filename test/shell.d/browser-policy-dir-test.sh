@@ -306,6 +306,27 @@ jq -e '
   fail "Omafox policy setup preserves existing enterprise settings"
 pass "Omafox policy setup merges into an existing enterprise policy"
 
+for mode in blocked removed allowed force_installed normal_installed; do
+  jq --arg mode "$mode" '
+    .policies.ExtensionSettings["@omafox"] = {
+      "installation_mode": $mode,
+      "install_url": "https://example.com/omafox.xpi",
+      "blocked_install_message": "Contact your administrator",
+      "restricted_domains": ["example.com"]
+    }
+  ' "$omafox_dist/policies.json" >"$test_tmp/existing-omafox.json"
+  cp "$test_tmp/existing-omafox.json" "$omafox_dist/policies.json"
+  policy_before=$(jq -S . "$omafox_dist/policies.json")
+
+  for attempt in 1 2; do
+    browser_policy_ensure_firefox_omafox_policy "$omafox_dist" ||
+      fail "Omafox policy setup respects an existing $mode policy"
+    [[ $(jq -S . "$omafox_dist/policies.json") == "$policy_before" ]] ||
+      fail "Omafox policy setup preserves all settings of an existing $mode policy"
+  done
+  pass "Omafox policy setup preserves an existing $mode policy on repeated runs"
+done
+
 printf '{not valid json\n' >"$omafox_dist/policies.json"
 browser_policy_ensure_firefox_omafox_policy "$omafox_dist" 2>/dev/null ||
   fail "Omafox policy setup skips an invalid trusted policy"

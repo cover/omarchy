@@ -180,16 +180,21 @@ browser_policy_ensure_firefox_omafox_policy() {
     return
   fi
 
+  # Keep administrator-defined Omafox settings, including installation bans.
   tmp=$(mktemp) || return 1
   if ! as_root jq '
     if type == "object" and
       (.policies | type == "object") and
       ((.policies.ExtensionSettings == null) or (.policies.ExtensionSettings | type == "object"))
     then
-      .policies.ExtensionSettings["@omafox"] = {
-        "installation_mode": "normal_installed",
-        "install_url": "https://addons.mozilla.org/firefox/downloads/latest/omafox/latest.xpi"
-      }
+      if (.policies.ExtensionSettings | has("@omafox")) then
+        .
+      else
+        .policies.ExtensionSettings["@omafox"] = {
+          "installation_mode": "normal_installed",
+          "install_url": "https://addons.mozilla.org/firefox/downloads/latest/omafox/latest.xpi"
+        }
+      end
     else
       error("policies.json does not contain a valid policies object")
     end
